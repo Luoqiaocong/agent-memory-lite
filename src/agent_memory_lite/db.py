@@ -1,16 +1,14 @@
 import sqlite3
-import time
 from pathlib import Path
 
-db_path = Path(__file__).resolve().parent.parent/ "data" / "memory.db"
+db_path = Path(__file__).resolve().parent.parent.parent/ "data" / "memory.db"
 db_path.parent.mkdir(parents=True, exist_ok=True)
 
 class MemoryDB:
     def __init__(self, db_path=db_path):
-        # 使用内存数据库，随时可测
         self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row
-        self._init_table()
+        # self._init_table()
 
     def _init_table(self):
         """第 1 步：建库建表"""
@@ -35,4 +33,5 @@ class MemoryDB:
 # 测试运行
 if __name__ == "__main__":
     db = MemoryDB()
+    db._init_table()
     print("✅ 第 1 步完成：专业级记忆事实表初始化成功！")

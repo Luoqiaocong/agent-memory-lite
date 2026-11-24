@@ -7,7 +7,9 @@ authors = [
     { name = "luoqiaocong", email = "luoqiaocong@gmail.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "pydantic>=2.14.4",
+]
 
 [project.scripts]
 agent-memory-lite = "agent_memory_lite:main"
