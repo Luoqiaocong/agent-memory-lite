@@ -1,1 +1,21 @@
-data/*.db
+# 1. 本地数据库文件（绝对不传私有记忆数据）
+*.db
+*.sqlite
+*.sqlite3
+data/
+
+# 2. Python 虚拟环境与编译缓存
+.venv/
+__pycache__/
+*.py[cod]
+dist/
+build/
+*.egg-info/
+
+# 3. 环境变量与 API Key（为后面接大模型提前防盗！）
+.env
+.env.*
+
+# 4. 编辑器与系统垃圾文件
+.vscode/
+.DS_Store

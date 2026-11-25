@@ -8,7 +8,7 @@ class MemoryDB:
     def __init__(self, db_path=db_path):
         self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row
-        # self._init_table()
+        self._init_table()
 
     def _init_table(self):
         """第 1 步：建库建表"""

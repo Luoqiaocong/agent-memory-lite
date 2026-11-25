@@ -1,15 +1,17 @@
-from typing import Annotated
+import time
+from typing import Optional
+from pydantic import BaseModel, Field
 
-from pydantic import BaseModel,Field
-from datetime import datetime
+ts_func = lambda: int(time.time()*1000)
 
-class FactScheama(BaseModel):
-    user_id: str    
+
+class FactSchema(BaseModel):
+    user_id: str
     fact_key: str
     fact_value: str
-    confidence:float
-    hit_count:int
-    is_active:Annotated[int, Field(default=1)]
-    previous_value:Annotated[str, Field(default=None)] 
-    updated_at:Annotated[datetime, Field(default=datetime.now())]
-   
+    confidence: float = Field(default=1.0)
+    hit_count: int = Field(default=1)
+    is_active: int = Field(default=1)
+    previous_value: Optional[str] = Field(default=None)
+    # 动态获取当前时间戳(秒)，与数据库中的 updated_at REAL 完美契合
+    updated_at: float = Field(default_factory=ts_func)
