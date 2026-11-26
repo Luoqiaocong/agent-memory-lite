@@ -1,14 +1,32 @@
 import sqlite3
 from pathlib import Path
+import threading
 
 db_path = Path(__file__).resolve().parent.parent.parent/ "data" / "memory.db"
 db_path.parent.mkdir(parents=True, exist_ok=True)
 
 class MemoryDB:
     def __init__(self, db_path=db_path):
-        self.conn = sqlite3.connect(db_path)
-        self.conn.row_factory = sqlite3.Row
+        self.db_path = db_path
+        # 1. 创建一个线程隔离的“魔法储物柜”
+        self._local = threading.local()
         self._init_table()
+        
+    @property
+    def conn(self) -> sqlite3.Connection:
+        # 2. 去当前线程的抽屉里看看有没有专属连接（第一次来会没有，所以用 getattr 防报错）
+        conn = getattr(self._local, "conn", None)
+        
+        if conn is None:
+            # 3. 如果当前线程还没有连接，就现场为它单独建一根！
+            conn = sqlite3.connect(self.db_path, timeout=30.0)
+            conn.row_factory = sqlite3.Row
+            # 开启 WAL 模式：允许不同线程“边读边写”，防 database is locked
+            conn.execute("PRAGMA journal_mode=WAL;")
+            # 存进当前线程自己的抽屉里，下次直接复用
+            self._local.conn = conn
+            
+        return conn
 
     def _init_table(self):
         """第 1 步：建库建表"""

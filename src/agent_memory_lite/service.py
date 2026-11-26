@@ -1,10 +1,9 @@
 from typing import List, Dict, Any, Optional
 from .db import MemoryDB
-from .extractor import mock_extract
-from .schema import FactSchema
+from .schema import Fact
 from collections import defaultdict
 
-SINGLE_VALUE_KEYS={"city"}
+SINGLE_VALUE_KEYS={"location", "name", "job"}
 
 select_sql = """
 select * from facts where user_id = ? and fact_key = ? and is_active = 1 and fact_value != ?
@@ -27,31 +26,20 @@ class MemoryService:
     def __init__(self, db: MemoryDB):
         self.db = db
 
-    def record_user_input(self, user_id: str, text: str) -> List[FactSchema]:
+    def record_fact(self, user_id: str,facts:List[Fact]) -> str:
         """
-        第 3 步：写入骨架（只做纯新增）
+        写入骨架（只做纯新增）
         """
-        # 1. 模拟抽取
-        raw_facts = mock_extract(user_id, text)
-        if not raw_facts:
-            return []
-
-        # 2. 转换为 Pydantic 对象，自动补全默认值 (hit_count=1, is_active=1, updated_at=当前时间戳)
-        new_facts = [FactSchema(**item) for item in raw_facts]
-
-        # 3. 使用 SQLite 命名占位符 (:字段名)，完美对齐 model_dump() 字典
-       
-
         # 4. 批量执行写入 (事务内提交)
         with self.db.conn:
-            for fact in new_facts:
+            for fact in facts:
                 if fact.fact_key in SINGLE_VALUE_KEYS:
                     user_facts = self._find_active_conflict(user_id,fact.fact_key,fact.fact_value)
                     if user_facts:
                         self.db.conn.execute(update_sql, (fact.updated_at,user_id, fact.fact_key))
                         fact.previous_value = user_facts["fact_value"]
                 self.db.conn.execute(upsert_sql, fact.model_dump())
-        return new_facts
+        return "ok"
 
     def get_user_facts(self, user_id: str,limit:int=20):
         """查询指定用户当前的所有有效事实"""
