@@ -1,6 +1,8 @@
 from typing import List, Optional, Set
 from sqlmodel import Session, select, col
 
+from .utils import ts_func
+
 from .db import MemoryDB
 from .schema import Fact
 
@@ -98,3 +100,22 @@ class FactRepository:
             session.add(existing)
         else:
             session.add(fact)
+    
+    def deactivate_fact(self, user_id: str, fact_key: str, fact_value: str) -> bool:
+        """停用指定的单条有效记忆（软删除）"""
+        with Session(self.engine) as session:
+            statement = select(Fact).where(
+                Fact.user_id == user_id,
+                Fact.fact_key == fact_key,
+                Fact.fact_value == fact_value,
+                Fact.is_active == 1,
+            )
+            fact = session.exec(statement).first()
+            if not fact:
+                return False
+
+            fact.is_active = 0
+            fact.updated_at = ts_func()
+            session.add(fact)
+            session.commit()
+            return True

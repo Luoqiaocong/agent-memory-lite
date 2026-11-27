@@ -2,7 +2,7 @@ from typing import List, Dict, Any, Optional
 
 from .repo import FactRepository
 from .db import MemoryDB
-from .schema import Fact
+from .schema import Fact, FactKey
 from collections import defaultdict
 
 SINGLE_VALUE_KEYS={"location", "name", "job"}
@@ -33,5 +33,6 @@ class MemoryService:
             
         return "[已知用户长期记忆]\n"+"\n".join([f"{key}:{'、'.join(values)}" for key,values in grouped.items()])+"\n\n请在回答时自然运用以上背景信息，但不要刻意生硬地说出‘根据我的记忆数据库…"
         
-        
+    def forget_fact(self, user_id: str, fact_key: FactKey, fact_value: str) -> str:
+        return "ok" if self.repo.deactivate_fact(user_id, fact_key, fact_value) else "not found"
 

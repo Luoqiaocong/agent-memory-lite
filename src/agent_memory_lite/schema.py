@@ -3,11 +3,10 @@ import time
 from typing import List, Literal, Optional
 from sqlmodel import SQLModel, Field
 from sqlalchemy import String, UniqueConstraint
+from .types import FactKey
+from .utils import ts_func
 
 
-def ts_func() -> float: return float(int(time.time() * 1000))
-
-FactKey = Literal["job","location","preference","allergy", "skill","name"]
 
 class Fact(SQLModel, table=True): 
     __tablename__ = "facts" # type: ignore
