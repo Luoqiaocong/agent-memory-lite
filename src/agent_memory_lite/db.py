@@ -1,55 +1,35 @@
-import sqlite3
 from pathlib import Path
-import threading
+from typing import Optional
+from sqlmodel import SQLModel, create_engine
 
-db_path = Path(__file__).resolve().parent.parent.parent/ "data" / "memory.db"
-db_path.parent.mkdir(parents=True, exist_ok=True)
+# 必须导入 Fact，让它登记到 SQLModel.metadata 里，create_all 才找得到它
+from .schema import Fact  # noqa: F401
+
+DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+
 
 class MemoryDB:
-    def __init__(self, db_path=db_path):
-        self.db_path = db_path
-        # 1. 创建一个线程隔离的“魔法储物柜”
-        self._local = threading.local()
-        self._init_table()
-        
-    @property
-    def conn(self) -> sqlite3.Connection:
-        # 2. 去当前线程的抽屉里看看有没有专属连接（第一次来会没有，所以用 getattr 防报错）
-        conn = getattr(self._local, "conn", None)
-        
-        if conn is None:
-            # 3. 如果当前线程还没有连接，就现场为它单独建一根！
-            conn = sqlite3.connect(self.db_path, timeout=30.0)
-            conn.row_factory = sqlite3.Row
-            # 开启 WAL 模式：允许不同线程“边读边写”，防 database is locked
-            conn.execute("PRAGMA journal_mode=WAL;")
-            # 存进当前线程自己的抽屉里，下次直接复用
-            self._local.conn = conn
-            
-        return conn
+    def __init__(self, db_url: Optional[str] = None, echo: bool = False):
+        if db_url is None:
+            # parents=True 递归创建缺失的父目录，exist_ok=True 目录已存在时不报错
+            DEFAULT_DATA_DIR.mkdir(parents=True, exist_ok=True)
+            # 用 .as_posix() 把 Windows 反斜杠 \ 转成 URL 标准的正斜杠 /
+            db_file = (DEFAULT_DATA_DIR / "memory.db").as_posix()
+            db_url = f"sqlite:///{db_file}"
 
-    def _init_table(self):
-        """第 1 步：建库建表"""
-        with self.conn:
-            self.conn.execute("""
-                CREATE TABLE IF NOT EXISTS facts (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id TEXT NOT NULL,              -- 谁的记忆
-                    fact_key TEXT NOT NULL,             -- 哪一类，如 preference
-                    fact_value TEXT NOT NULL,           -- 具体值，如 摄影
-                    confidence REAL DEFAULT 1.0,        -- 置信度，0到1
-                    hit_count INTEGER DEFAULT 1,        -- 被提及/提取次数
-                    is_active INTEGER DEFAULT 1,        -- 是否启用(1启用, 0失效)
-                    previous_value TEXT,                -- 被覆盖前的旧值，可空
-                    updated_at REAL NOT NULL,           -- 更新时间
-                    
-                    -- 核心约束：同一个用户的同一条具体事实不可重复
-                    UNIQUE(user_id, fact_key, fact_value)
-                );
-            """)
+        # 只有 SQLite 需要关闭同线程检查；未来换成 MySQL/PG 时传空字典
+        connect_args = {"check_same_thread": False} if db_url.startswith("sqlite") else {}
 
-# 测试运行
+        # 创建全局 Engine（SQLAlchemy 自带连接池和多线程调度）
+        self.engine = create_engine(db_url, echo=echo, connect_args=connect_args)
+        self.init_db()
+
+    def init_db(self):
+        """自动扫描所有 table=True 的模型并建表"""
+        SQLModel.metadata.create_all(self.engine)
+
+
 if __name__ == "__main__":
-    db = MemoryDB()
-    db._init_table()
-    print("✅ 第 1 步完成：专业级记忆事实表初始化成功！")
+    # 用纯内存库 + echo=True 试跑，终端能看到自动生成的建表 SQL！
+    db = MemoryDB(db_url="sqlite:///:memory:", echo=True)
+    print("✅ 第 3 步完成：SQLModel Engine 初始化与自动建表成功！")

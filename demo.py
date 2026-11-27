@@ -1,8 +1,5 @@
 # demo.py
-from typing import List
-from langchain.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
-from agent_memory_lite.db import MemoryDB
 from agent_memory_lite.service import MemoryService
 from langchain.messages import SystemMessage,HumanMessage
 from langchain_core.runnables import RunnableConfig
@@ -30,14 +27,16 @@ prompt = """你是一个懂用户、有温度的专属私人助手，具备长�
 
 
 if __name__ == "__main__":
-    db = MemoryDB()
-    service = MemoryService(db)
+    
+    service = MemoryService()
     
     agent = init_agent(prompt,tools=build_memory_tools(service),checkpointer=InMemorySaver())
     config:RunnableConfig = {"configurable": {"thread_id": "session_1"}}
 
     while True:
         user_input = input("用户输入：")
+        if user_input.strip().lower() == "q":
+            break
         r = agent.invoke({"messages":[HumanMessage(content=user_input)]}, config=config)
         for message in r["messages"]:
             message.pretty_print()

@@ -12,6 +12,7 @@ dependencies = [
     "langchain-openai>=1.8.5",
     "pydantic>=2.14.4",
     "python-dotenv>=1.2.4",
+    "sqlmodel>=0.0.50",
 ]
 
 [project.scripts]
