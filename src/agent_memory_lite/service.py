@@ -1,8 +1,8 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Optional
 
 from .repo import FactRepository
 from .db import MemoryDB
-from .schema import Fact, FactKey
+from .schema import ExtractedFact, Fact, FactKey
 from collections import defaultdict
 
 SINGLE_VALUE_KEYS={"location", "name", "job"}
@@ -12,8 +12,8 @@ class MemoryService:
     def __init__(self,db_url:Optional[str]=None):
         self.repo = FactRepository(MemoryDB(db_url=db_url))
 
-    def record_fact(self, user_id: str,facts:List[Fact]) -> str:
-        self.repo.save_facts(user_id, facts, SINGLE_VALUE_KEYS)
+    def record_fact(self, user_id: str,facts:List[ExtractedFact]) -> str:
+        self.repo.save_facts(user_id,[(Fact(**fact.model_dump(exclude={"replace_id"}),user_id=user_id),fact.replace_id) for fact in facts], SINGLE_VALUE_KEYS)
         return "ok"
 
     def get_user_facts(self, user_id: str,limit:int=20):
@@ -23,10 +23,10 @@ class MemoryService:
     def build_memory_prompt(self, user_id: str, limit: int = 20)-> str:
         facts = self.get_user_facts(user_id,limit)
         if not facts:return ""
-        grouped = defaultdict(list)
+        grouped = defaultdict(list)  # 值是列表，当键不存在的时候，默认创建一个空列表
          
         for fact in facts:
-            value = fact.fact_value
+            value = fact.fact_value+f"({fact.id})"
             if fact.previous_value:
                 value += f"|之前:{fact.previous_value}"
             grouped[fact.fact_key].append(value)
@@ -36,3 +36,5 @@ class MemoryService:
     def forget_fact(self, user_id: str, fact_key: FactKey, fact_value: str) -> str:
         return "ok" if self.repo.deactivate_fact(user_id, fact_key, fact_value) else "not found"
 
+
+    
