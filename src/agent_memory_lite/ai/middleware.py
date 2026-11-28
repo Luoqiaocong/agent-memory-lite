@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from langchain.agents.middleware import ModelRequest, dynamic_prompt
+from langchain.messages import HumanMessage
 
 from agent_memory_lite.service import MemoryService
 
@@ -19,7 +20,11 @@ def build_memory_middleware(service: MemoryService):
     def personalized_prompt(request: ModelRequest[MemoryContext]) -> str:
         ctx = request.runtime.context if request.runtime else None
         user_id = ctx.user_id if ctx else None
-        memory = service.build_memory_prompt(user_id) if user_id else ""
+        query = next(
+            (m.text for m in reversed(request.messages) if isinstance(m, HumanMessage)),
+            None,
+        )
+        memory = service.build_memory_prompt(user_id, query=query) if user_id else ""
         parts = [p for p in (request.system_prompt, memory) if p]
         return "\n\n".join(parts)
 
