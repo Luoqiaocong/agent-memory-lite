@@ -1,5 +1,10 @@
-import pytest
+from types import SimpleNamespace
+from typing import Any, cast
 
+import pytest
+from langchain.agents.middleware import ModelRequest
+
+from agent_memory_lite.ai.middleware import MemoryContext, build_memory_middleware
 from agent_memory_lite.ai.tool import build_memory_tools
 from agent_memory_lite.schema import ExtractedFact
 from agent_memory_lite.service import MemoryService
@@ -87,7 +92,8 @@ def test_multi_value_and_user_isolation(service:MemoryService):
 
 
 def test_memory_tools(service:MemoryService):
-    get_long_memory, upsert_long_memory, forget_long_memory = build_memory_tools(service)
+    tools = {t.name: t for t in build_memory_tools(service)}
+    get_long_memory,forget_long_memory, upsert_long_memory = tools["get_long_memory"], tools["forget_long_memory"], tools["upsert_long_memory"]
 
     assert get_long_memory.invoke({"user_id": "user_101"}) == ""
 
@@ -110,3 +116,58 @@ def test_memory_tools(service:MemoryService):
         == "ok"
     )
     assert get_long_memory.invoke({"user_id": "user_101"}) == ""
+
+
+def test_memory_middleware(service: MemoryService):
+    middleware = build_memory_middleware(service)
+
+    def run_middleware(context: MemoryContext | None) -> str | None:
+        captured: dict[str, str | None] = {}
+        req = ModelRequest(
+            model=cast(Any, None),
+            messages=[],
+            system_prompt="你是私人助手",
+            runtime=cast(Any, SimpleNamespace(context=context)),
+        )
+        # 拦截传给下游模型的最终请求，检查 system_prompt 是否按预期注入
+        middleware.wrap_model_call(
+            req,
+            lambda new_req: cast(Any, captured.update({"prompt": new_req.system_prompt}) or "ok"),
+        )
+        return captured["prompt"]
+
+    # 1. 新用户或未传上下文时，保留原提示词不被覆盖为空
+    assert run_middleware(None) == "你是私人助手"
+    assert run_middleware(MemoryContext(user_id="user_101")) == "你是私人助手"
+
+    # 2. 有记忆后，原提示词与长期记忆一起注入
+    service.record_fact("user_101", [ExtractedFact(fact_key="location", fact_value="杭州")])
+    injected = run_middleware(MemoryContext(user_id="user_101"))
+    assert injected is not None
+    assert injected.startswith("你是私人助手\n\n[已知用户长期记忆]")
+    assert "location:杭州(" in injected
+
+
+def test_fact_history(service: MemoryService):
+    tools = {t.name: t for t in build_memory_tools(service)}
+    get_history = tools["get_long_memory_history"]
+
+    # 未记录过的键返回 not found
+    assert get_history.invoke({"user_id": "user_101", "fact_key": "allergy"}) == "not found"
+
+    # 连续迁移三次：北京 -> 杭州 -> 上海
+    for city in ("北京", "杭州", "上海"):
+        service.record_fact("user_101", [ExtractedFact(fact_key="location", fact_value=city)])
+
+    history = get_history.invoke({"user_id": "user_101", "fact_key": "location"})
+    assert "当前生效记忆：\n- location:上海" in history
+    assert "历史记录：" in history
+    assert "- location:杭州" in history
+    assert "- location:北京" in history
+    assert history.index("杭州") < history.index("北京")
+
+    # 彻底遗忘当前生效记忆后，不应出现空“当前生效记忆：”标题
+    assert service.forget_fact("user_101", "location", "上海") == "ok"
+    after_forget = service.get_fact_history("user_101", "location")
+    assert "当前生效记忆" not in after_forget
+    assert "- location:上海" in after_forget
