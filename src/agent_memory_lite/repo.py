@@ -142,6 +142,8 @@ class FactRepository:
             # 仅当本次产生了新前任时才覆写，避免原地重复提及（previous_value 为 None）时误清空老前任
             if fact.previous_value is not None:
                 existing.previous_value = fact.previous_value
+            if fact.embedding is not None:
+                existing.embedding = fact.embedding
             session.add(existing)
         else:
             session.add(fact)
