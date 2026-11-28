@@ -165,3 +165,12 @@ class FactRepository:
             session.commit()
             return True
 
+    def get_fact_history(self, user_id: str, fact_key: str, limit: int = 10) -> List[Fact]:
+        """按时间倒序查询指定事实键的全部历史记录（含已停用记忆）"""
+        with Session(self.engine) as session:
+            statement = select(Fact).where(
+                Fact.user_id == user_id,
+                Fact.fact_key == fact_key,
+            ).order_by(col(Fact.updated_at).desc(),col(Fact.id).desc()).limit(limit)
+            
+            return list(session.exec(statement).all())
