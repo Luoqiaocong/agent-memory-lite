@@ -1,9 +1,17 @@
 # demo.py
-from langgraph.checkpoint.memory import InMemorySaver
-from agent_memory_lite.service import MemoryService
 from langchain.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
-from agent_memory_lite.ai import init_agent, build_memory_tools, build_memory_middleware, MemoryContext
+from langgraph.checkpoint.memory import InMemorySaver
+
+from agent_memory_lite.ai import (
+    MemoryContext,
+    build_memory_middleware,
+    build_memory_tools,
+    embed_texts,
+    init_agent,
+)
+from agent_memory_lite.service import MemoryService
+from agent_memory_lite.utils import setup_logging
 
 prompt = """你是一个懂用户、有温度的专属私人助手，具备长期记忆能力。
 当前对话用户的 user_id 为：user_101（调用任何记忆工具时均需传入此 user_id）。
@@ -35,9 +43,9 @@ prompt = """你是一个懂用户、有温度的专属私人助手，具备长�
 
 
 if __name__ == "__main__":
-    
-    service = MemoryService()
-    
+    setup_logging(debug=True)
+    service = MemoryService(embedder=embed_texts)
+
     agent = init_agent(
         prompt,
         tools=build_memory_tools(service),
@@ -45,7 +53,7 @@ if __name__ == "__main__":
         middleware=[build_memory_middleware(service)],
         context_schema=MemoryContext,
     )
-    config:RunnableConfig = {"configurable": {"thread_id": "session_1"}}
+    config: RunnableConfig = {"configurable": {"thread_id": "session_1"}}
 
     while True:
         user_input = input("input：")
