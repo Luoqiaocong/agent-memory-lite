@@ -171,3 +171,26 @@ def test_fact_history(service: MemoryService):
     after_forget = service.get_fact_history("user_101", "location")
     assert "当前生效记忆" not in after_forget
     assert "- location:上海" in after_forget
+
+
+def test_semantic_search(service: MemoryService):
+    vecs = {
+        "preference:拿铁": [1.0, 0.0],
+        "skill:Python": [0.0, 1.0],
+        "想喝咖啡": [1.0, 0.0],
+        "写请假条": [-1.0, 0.0],
+    }
+    service.embedder = lambda texts: [vecs[t] for t in texts]
+
+    service.record_fact(
+        "user_101",
+        [
+            ExtractedFact(fact_key="preference", fact_value="拿铁"),
+            ExtractedFact(fact_key="skill", fact_value="Python"),
+        ],
+    )
+
+    prompt = service.build_memory_prompt("user_101", query="想喝咖啡")
+    assert "拿铁(" in prompt
+    assert "Python" not in prompt
+    assert service.build_memory_prompt("user_101", query="写请假条") == ""
