@@ -1,13 +1,19 @@
 from typing import List
 
-from langchain.tools import tool
+from langchain.tools import BaseTool, tool
 
 from agent_memory_lite.service import MemoryService
 from agent_memory_lite.schema import ExtractedFact
 from agent_memory_lite.types import FactKey
 
+tools:list[BaseTool]=[]
+def register(func):
+     t = tool(func)
+     tools.append(t)
+     return t
+
 def build_memory_tools(service:MemoryService):
-    @tool
+    @register
     def get_long_memory(user_id: str):
         """
         获取用户的长记忆
@@ -18,8 +24,7 @@ def build_memory_tools(service:MemoryService):
         """
         return service.build_memory_prompt(user_id)
 
-
-    @tool
+    @register
     def upsert_long_memory(user_id: str, facts: List[ExtractedFact])->str:
         """
         保存可复用有价值的用户长期记忆,只保存本轮对话新出现或变更的事实，严禁重复保存历史记忆
@@ -30,7 +35,7 @@ def build_memory_tools(service:MemoryService):
         """
         return service.record_fact(user_id,facts)
 
-    @tool
+    @register
     def forget_long_memory(user_id: str, fact_key: FactKey, fact_value: str)->str:
         """
         当用户明确表示放弃某个爱好、习惯或纠正错误记忆时调用；传入的 fact_value 需与记忆库中一致，若不确定可先调用 get_long_memory 确认
@@ -43,12 +48,21 @@ def build_memory_tools(service:MemoryService):
             str: 删除结果
             """
         return service.forget_fact(user_id,fact_key,fact_value)
+    
+    @register
+    def get_long_memory_history(user_id: str, fact_key: FactKey)->str:
+        """
+        按时间倒序获取某类长期记忆的完整变更历史（包含当前生效和已停用/曾替换的旧记录）；仅在用户主动追问过往经历时调用
+        Args:
+            user_id (str): 用户ID
+            fact_key (FactKey): 需要追溯历史的事实键（如 location、job、preference 等）
+        return:
+            str: 包含当前生效记录与过往历史轨迹的文本
+        """
+        return service.get_fact_history(user_id,fact_key)
 
-    # 当前工具较少，显式返回最直观；若后续工具增多不想每次手动维护列表，可改用“局部注册装饰器”自动收集：
-    #   tools = []
-    #   def register(func): t = tool(func); tools.append(t); return t
-    # 各工具函数改挂 @register，最后直接 return tools 即可
-    return [get_long_memory,upsert_long_memory,forget_long_memory]
+
+    return tools
 
     
         
