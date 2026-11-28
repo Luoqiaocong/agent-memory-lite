@@ -29,6 +29,7 @@ class Fact(SQLModel, table=True):
     previous_value: Optional[str] = Field(default=None)
     # 动态获取当前时间戳(毫秒)，与数据库中的 updated_at Float/REAL 完美契合
     updated_at: float = Field(default_factory=ts_func)
+    embedding: Optional[str] = Field(default=None)
 
 class ExtractedFact(SQLModel):
     """从外部模型中提取的Fact"""
